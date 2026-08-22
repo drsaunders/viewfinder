@@ -33,23 +33,9 @@ export function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
-/** Split a rotation into 90° turns plus a tilt in (-45, 45] degrees. */
-export function splitRotation(radians: number): { turns: number; tiltDeg: number } {
-  const deg = (radians * 180) / Math.PI;
-  let turns = Math.trunc(deg / 90);
-  let tiltDeg = deg - turns * 90;
-  if (tiltDeg > 45) {
-    turns += 1;
-    tiltDeg -= 90;
-  } else if (tiltDeg < -45) {
-    turns -= 1;
-    tiltDeg += 90;
-  }
-  return { turns, tiltDeg };
-}
-
-export function fromTurnsAndTilt(turns: number, tiltDeg: number): number {
-  return (turns * 90 + tiltDeg) * (Math.PI / 180);
+export function snapQuarterTurn(radians: number): number {
+  const quarter = Math.PI / 2;
+  return Math.round(radians / quarter) * quarter;
 }
 
 export function defaultCrop(imgW: number, imgH: number): CropState {
@@ -75,24 +61,8 @@ export function cropCorners(crop: CropState): Point[] {
   return locals.map((p) => rotatePoint(add(origin, p), origin, crop.rotation));
 }
 
-export function cropTopMid(crop: CropState): Point {
-  const { h } = cropExtent(crop.width);
-  const origin: Point = { x: crop.cx, y: crop.cy };
-  return rotatePoint(
-    { x: crop.cx, y: crop.cy - h / 2 },
-    origin,
-    crop.rotation,
-  );
-}
-
-export function cropRotateHandle(crop: CropState, handleLen: number): Point {
-  const { h } = cropExtent(crop.width);
-  const origin: Point = { x: crop.cx, y: crop.cy };
-  return rotatePoint(
-    { x: crop.cx, y: crop.cy - h / 2 - handleLen },
-    origin,
-    crop.rotation,
-  );
+export function rotateCropBy(crop: CropState, delta: number): CropState {
+  return { ...crop, rotation: snapQuarterTurn(crop.rotation + delta) };
 }
 
 export function imageCorners(imgW: number, imgH: number): Point[] {
@@ -229,10 +199,6 @@ export function resizeCropFromCorner(
 
 export function scaleCrop(crop: CropState, factor: number): CropState {
   return { ...crop, width: crop.width * factor };
-}
-
-export function rotateCropBy(crop: CropState, delta: number): CropState {
-  return { ...crop, rotation: crop.rotation + delta };
 }
 
 export interface ViewMap {

@@ -2,8 +2,6 @@ import {
   boundsOf,
   cropCorners,
   cropExtent,
-  cropRotateHandle,
-  cropTopMid,
   expandRect,
   fitView,
   rotatedImageCorners,
@@ -121,15 +119,10 @@ export function paintCropOverlay(
   svg.setAttribute("height", String(cssH));
 
   const corners = cropCorners(crop).map((p) => workToScreen(p, view));
-  const top = workToScreen(cropTopMid(crop), view);
-  const handleLen = 28;
-  const handle = workToScreen(cropRotateHandle(crop, handleLen / view.scale), view);
 
   const dim = svg.querySelector<SVGPathElement>("#crop-dim");
   const frame = svg.querySelector<SVGPolygonElement>("#crop-frame");
-  const rod = svg.querySelector<SVGLineElement>("#crop-rod");
-  const knob = svg.querySelector<SVGCircleElement>("#crop-knob");
-  if (!dim || !frame || !rod || !knob) return;
+  if (!dim || !frame) return;
 
   const quad = corners.map((p) => `${p.x},${p.y}`).join(" ");
   dim.setAttribute(
@@ -137,12 +130,6 @@ export function paintCropOverlay(
     `M0,0H${cssW}V${cssH}H0Z M${corners[0].x},${corners[0].y}L${corners[1].x},${corners[1].y}L${corners[2].x},${corners[2].y}L${corners[3].x},${corners[3].y}Z`,
   );
   frame.setAttribute("points", quad);
-  rod.setAttribute("x1", String(top.x));
-  rod.setAttribute("y1", String(top.y));
-  rod.setAttribute("x2", String(handle.x));
-  rod.setAttribute("y2", String(handle.y));
-  knob.setAttribute("cx", String(handle.x));
-  knob.setAttribute("cy", String(handle.y));
 
   corners.forEach((p, i) => {
     const node = svg.querySelector<SVGCircleElement>(`#crop-c${i}`);
@@ -173,12 +160,7 @@ export function hitEditor(
   pointer: Point,
   crop: CropState,
   view: ViewMap,
-): { kind: "rotate" | "corner" | "move" | "none"; corner?: number } {
-  const handleLen = 28;
-  const handle = workToScreen(cropRotateHandle(crop, handleLen / view.scale), view);
-  if (Math.hypot(pointer.x - handle.x, pointer.y - handle.y) <= 22) {
-    return { kind: "rotate" };
-  }
+): { kind: "corner" | "move" | "none"; corner?: number } {
   const corners = cropCorners(crop).map((p) => workToScreen(p, view));
   for (let i = 0; i < corners.length; i++) {
     const p = corners[i];

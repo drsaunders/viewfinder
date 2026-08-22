@@ -35,12 +35,11 @@ export interface UiPrefs {
   selectedId: string | null;
 }
 
-export type EditorHandle = "move" | "rotate" | "corner";
+export type EditorHandle = "move" | "corner";
 
 export interface EditorDrag {
   kind: EditorHandle;
   corner?: number;
   startPointer: Point;
   startCrop: CropState;
-  startAngle?: number;
 }

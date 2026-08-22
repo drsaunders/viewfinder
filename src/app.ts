@@ -10,13 +10,12 @@ import { isImageFile, decodePhoto, recordFromFile } from "./image.ts";
 import {
   clampCrop,
   defaultCrop,
-  fromTurnsAndTilt,
   moveCrop,
   resizeCropFromCorner,
   rotateCropBy,
   scaleCrop,
   screenToWork,
-  splitRotation,
+  snapQuarterTurn,
   type ViewMap,
 } from "./math.ts";
 import {
@@ -41,8 +40,7 @@ export class App {
   private viewMap: ViewMap | null = null;
   private drag: EditorDrag | null = null;
   private pointers = new Map<number, Point>();
-  private pinch: { startDist: number; startAngle: number; startCrop: CropState } | null =
-    null;
+  private pinch: { startDist: number; startCrop: CropState } | null = null;
   private guard = new ScreenGuard();
   private studio = false;
   private chromeHidden = false;
@@ -62,7 +60,6 @@ export class App {
   private readonly thumbsEl = $("#thumbs");
   private readonly fileInput = $("#file-input") as HTMLInputElement;
   private readonly toast = $("#toast");
-  private readonly tilt = $("#image-tilt") as HTMLInputElement;
   private readonly btnCrosshair = $("#btn-crosshair");
   private readonly btnFullscreen = $("#btn-fullscreen");
 
@@ -104,7 +101,6 @@ export class App {
     $("#btn-img-cw-crop").addEventListener("click", () => this.nudgeImage(HALF_PI));
     $("#btn-crop-ccw").addEventListener("click", () => this.nudgeCrop(-HALF_PI));
     $("#btn-crop-cw").addEventListener("click", () => this.nudgeCrop(HALF_PI));
-    this.tilt.addEventListener("input", () => this.setImageTilt(Number(this.tilt.value)));
 
     this.overlay.addEventListener("pointerdown", (e) => this.onPointerDown(e));
     this.overlay.addEventListener("pointermove", (e) => this.onPointerMove(e));
@@ -160,7 +156,7 @@ export class App {
     this.loading.hidden = false;
     try {
       this.bitmap = await decodePhoto(photo.blob);
-      this.syncTilt();
+      this.snapStoredRotations();
     } catch {
       this.announce("Could not open that photo.");
     } finally {
@@ -211,7 +207,6 @@ export class App {
     if (!this.selected || !this.bitmap) return;
     this.selected.crop = defaultCrop(this.bitmap.width, this.bitmap.height);
     this.selected.imageRotation = 0;
-    this.syncTilt();
     this.persistSelected();
     this.render();
   }
@@ -275,16 +270,7 @@ export class App {
 
   private nudgeImage(delta: number): void {
     if (!this.selected) return;
-    this.selected.imageRotation += delta;
-    this.syncTilt();
-    this.persistSelected();
-    this.render();
-  }
-
-  private setImageTilt(degrees: number): void {
-    if (!this.selected) return;
-    const { turns } = splitRotation(this.selected.imageRotation);
-    this.selected.imageRotation = fromTurnsAndTilt(turns, degrees);
+    this.selected.imageRotation = snapQuarterTurn(this.selected.imageRotation + delta);
     this.persistSelected();
     this.render();
   }
@@ -296,9 +282,19 @@ export class App {
     this.render();
   }
 
-  private syncTilt(): void {
+  private snapStoredRotations(): void {
     if (!this.selected) return;
-    this.tilt.value = String(Math.round(splitRotation(this.selected.imageRotation).tiltDeg));
+    const imageRotation = snapQuarterTurn(this.selected.imageRotation);
+    const rotation = snapQuarterTurn(this.selected.crop.rotation);
+    if (
+      imageRotation === this.selected.imageRotation &&
+      rotation === this.selected.crop.rotation
+    ) {
+      return;
+    }
+    this.selected.imageRotation = imageRotation;
+    this.selected.crop = { ...this.selected.crop, rotation };
+    this.persistSelected();
   }
 
   private persistSelected(): void {
@@ -331,7 +327,6 @@ export class App {
       this.drag = null;
       this.pinch = {
         startDist: Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y),
-        startAngle: Math.atan2(pts[1].y - pts[0].y, pts[1].x - pts[0].x),
         startCrop: { ...this.selected.crop },
       };
       return;
@@ -344,16 +339,6 @@ export class App {
       corner: hit.corner,
       startPointer: p,
       startCrop: { ...this.selected.crop },
-      startAngle: Math.atan2(p.y - this.workToScreenCenter().y, p.x - this.workToScreenCenter().x),
-    };
-  }
-
-  private workToScreenCenter(): Point {
-    if (!this.selected || !this.viewMap) return { x: 0, y: 0 };
-    const c = { x: this.selected.crop.cx, y: this.selected.crop.cy };
-    return {
-      x: c.x * this.viewMap.scale + this.viewMap.origin.x,
-      y: c.y * this.viewMap.scale + this.viewMap.origin.y,
     };
   }
 
@@ -366,10 +351,8 @@ export class App {
     if (this.pinch && this.pointers.size >= 2) {
       const pts = [...this.pointers.values()];
       const dist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
-      const angle = Math.atan2(pts[1].y - pts[0].y, pts[1].x - pts[0].x);
       const factor = dist / Math.max(1, this.pinch.startDist);
-      let next = scaleCrop(this.pinch.startCrop, factor);
-      next = rotateCropBy(next, angle - this.pinch.startAngle);
+      const next = scaleCrop(this.pinch.startCrop, factor);
       this.selected.crop = clampCrop(next, this.bitmap.width, this.bitmap.height);
       this.persistSelected();
       this.render();
@@ -387,22 +370,10 @@ export class App {
       });
     } else if (this.drag.kind === "corner" && this.drag.corner !== undefined) {
       next = resizeCropFromCorner(this.drag.startCrop, this.drag.corner, work);
-    } else if (this.drag.kind === "rotate") {
-      const center = this.workToScreenCenterFrom(this.drag.startCrop);
-      const angle = Math.atan2(p.y - center.y, p.x - center.x);
-      next = rotateCropBy(this.drag.startCrop, angle - (this.drag.startAngle ?? 0));
     }
     this.selected.crop = clampCrop(next, this.bitmap.width, this.bitmap.height);
     this.persistSelected();
     this.render();
-  }
-
-  private workToScreenCenterFrom(crop: CropState): Point {
-    if (!this.viewMap) return { x: 0, y: 0 };
-    return {
-      x: crop.cx * this.viewMap.scale + this.viewMap.origin.x,
-      y: crop.cy * this.viewMap.scale + this.viewMap.origin.y,
-    };
   }
 
   private onPointerUp(e: PointerEvent): void {

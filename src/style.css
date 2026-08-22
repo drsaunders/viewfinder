@@ -194,19 +194,6 @@ canvas#photo,
   color: var(--muted);
 }
 
-.crop-bar .tilt {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--muted);
-  font-size: 0.85rem;
-}
-
-.crop-bar input[type="range"] {
-  width: min(180px, 36vw);
-  accent-color: var(--accent);
-}
-
 .crop-dim {
   fill: rgba(0, 0, 0, 0.62);
 }
@@ -217,20 +204,10 @@ canvas#photo,
   stroke-width: 2.2;
 }
 
-.crop-rod {
-  stroke: var(--accent);
-  stroke-width: 1.6;
-}
-
 .crop-handle {
   fill: #1c1a16;
   stroke: var(--accent);
   stroke-width: 2;
-}
-
-.crop-handle.rotate {
-  fill: var(--accent);
-  stroke: #0e0d0b;
 }
 
 .hair {

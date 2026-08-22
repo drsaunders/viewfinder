@@ -158,7 +158,7 @@ export class App {
       this.bitmap = await decodePhoto(photo.blob);
       this.snapStoredRotations();
     } catch {
-      this.announce("Could not open that photo.");
+      this.announce("Could not open that photo. Remove it and add it again.");
     } finally {
       this.loading.hidden = true;
     }

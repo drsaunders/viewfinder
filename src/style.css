@@ -151,6 +151,10 @@ canvas#photo,
   pointer-events: none;
 }
 
+.overlay .off {
+  display: none;
+}
+
 .empty {
   position: absolute;
   inset: 0;
@@ -210,18 +214,23 @@ canvas#photo,
 .crop-frame {
   fill: none;
   stroke: var(--accent);
-  stroke-width: 1.6;
+  stroke-width: 2.2;
 }
 
 .crop-rod {
   stroke: var(--accent);
-  stroke-width: 1.2;
+  stroke-width: 1.6;
 }
 
 .crop-handle {
-  fill: var(--bg);
+  fill: #1c1a16;
   stroke: var(--accent);
-  stroke-width: 1.6;
+  stroke-width: 2;
+}
+
+.crop-handle.rotate {
+  fill: var(--accent);
+  stroke: #0e0d0b;
 }
 
 .hair {

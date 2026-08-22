@@ -78,7 +78,7 @@ export function editorViewMap(
   );
   const cropBounds = boundsOf(cropCorners(crop));
   const world = expandRect(unionRect(imageBounds, cropBounds), 24);
-  return fitView(world, cssW, cssH, 20);
+  return fitView(world, cssW, cssH, 56);
 }
 
 export function drawEditor(

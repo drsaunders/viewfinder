@@ -100,6 +100,8 @@ export class App {
 
     $("#btn-img-ccw").addEventListener("click", () => this.nudgeImage(-HALF_PI));
     $("#btn-img-cw").addEventListener("click", () => this.nudgeImage(HALF_PI));
+    $("#btn-img-ccw-crop").addEventListener("click", () => this.nudgeImage(-HALF_PI));
+    $("#btn-img-cw-crop").addEventListener("click", () => this.nudgeImage(HALF_PI));
     $("#btn-crop-ccw").addEventListener("click", () => this.nudgeCrop(-HALF_PI));
     $("#btn-crop-cw").addEventListener("click", () => this.nudgeCrop(HALF_PI));
     this.tilt.addEventListener("input", () => this.setImageTilt(Number(this.tilt.value)));
@@ -208,6 +210,8 @@ export class App {
   private resetCrop(): void {
     if (!this.selected || !this.bitmap) return;
     this.selected.crop = defaultCrop(this.bitmap.width, this.bitmap.height);
+    this.selected.imageRotation = 0;
+    this.syncTilt();
     this.persistSelected();
     this.render();
   }
@@ -513,14 +517,14 @@ export class App {
     const hairGroup = $("#hair-ui");
 
     if (!this.selected || !this.bitmap) {
-      cropGroup.hidden = true;
-      hairGroup.hidden = true;
+      setLayer(cropGroup, false);
+      setLayer(hairGroup, false);
       return;
     }
 
     if (this.mode === "crop") {
-      hairGroup.hidden = true;
-      cropGroup.hidden = false;
+      setLayer(hairGroup, false);
+      setLayer(cropGroup, true);
       this.viewMap = drawEditor(
         this.canvas,
         this.bitmap,
@@ -533,11 +537,11 @@ export class App {
       return;
     }
 
-    cropGroup.hidden = true;
+    setLayer(cropGroup, false);
     this.viewMap = null;
     drawView(this.canvas, this.bitmap, this.selected.crop, this.selected.imageRotation, w, h);
     paintCrosshair(this.overlay, w, h);
-    hairGroup.hidden = !this.prefs.crosshair;
+    setLayer(hairGroup, this.prefs.crosshair);
   }
 
   private announce(message: string): void {
@@ -553,4 +557,8 @@ function $(selector: string): HTMLElement {
     throw new Error(`Missing ${selector}`);
   }
   return el as HTMLElement;
+}
+
+function setLayer(el: HTMLElement, on: boolean): void {
+  el.classList.toggle("off", !on);
 }

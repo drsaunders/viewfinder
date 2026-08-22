@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#0e0d0b" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta
+      name="description"
+      content="A dark studio drawing reference: crop a photo to 4:5, drop a midpoint crosshair, and keep the screen awake."
+    />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <title>viewfinder</title>
+  </head>
+  <body>
+    <div id="app" class="app" data-mode="view">
+      <header class="chrome top">
+        <h1>viewfinder</h1>
+        <div class="cluster">
+          <button id="btn-library" type="button" aria-expanded="false">Library</button>
+          <button id="btn-add" type="button">Add photos</button>
+          <button id="btn-fullscreen" type="button" aria-pressed="false">
+            Full screen
+          </button>
+        </div>
+      </header>
+
+      <main id="stage" class="stage">
+        <div id="empty" class="empty">
+          <svg class="mark" viewBox="0 0 72 90" aria-hidden="true">
+            <rect x="8" y="8" width="56" height="74" rx="3" />
+            <path d="M36 8v74M8 45h56" />
+          </svg>
+          <h2>Set up a reference</h2>
+          <p>
+            Add a photo from your library, crop it to 4:5, and keep a faint midpoint
+            while you draw.
+          </p>
+          <button id="btn-add-empty" type="button">Add photos</button>
+        </div>
+        <div id="loading" class="loading" hidden>Opening photo…</div>
+        <canvas id="photo" hidden></canvas>
+        <svg id="overlay" class="overlay idle" xmlns="http://www.w3.org/2000/svg">
+          <g id="crop-ui" hidden>
+            <path id="crop-dim" class="crop-dim" fill-rule="evenodd" />
+            <polygon id="crop-frame" class="crop-frame" />
+            <line id="crop-rod" class="crop-rod" />
+            <circle id="crop-knob" class="crop-handle rotate" r="9" />
+            <circle id="crop-c0" class="crop-handle" r="7" />
+            <circle id="crop-c1" class="crop-handle" r="7" />
+            <circle id="crop-c2" class="crop-handle" r="7" />
+            <circle id="crop-c3" class="crop-handle" r="7" />
+          </g>
+          <g id="hair-ui" hidden>
+            <line id="hair-v" class="hair" />
+            <line id="hair-h" class="hair" />
+          </g>
+        </svg>
+      </main>
+
+      <footer id="view-bar" class="chrome bottom" hidden>
+        <button id="btn-crop" type="button">Crop</button>
+        <button id="btn-crosshair" type="button" aria-pressed="true">Crosshair</button>
+        <button id="btn-img-ccw" type="button" title="Rotate image 90° left">
+          Image ↺
+        </button>
+        <button id="btn-img-cw" type="button" title="Rotate image 90° right">
+          Image ↻
+        </button>
+      </footer>
+
+      <footer id="crop-bar" class="chrome bottom crop-bar" hidden>
+        <button id="btn-crop-done" type="button">Done</button>
+        <button id="btn-crop-reset" type="button">Reset crop</button>
+        <button id="btn-crop-ccw" type="button" title="Rotate crop 90° left">
+          Crop ↺
+        </button>
+        <button id="btn-crop-cw" type="button" title="Rotate crop 90° right">
+          Crop ↻
+        </button>
+        <label class="tilt">
+          <span>Image tilt</span>
+          <input id="image-tilt" type="range" min="-45" max="45" value="0" />
+        </label>
+      </footer>
+
+      <aside id="library" class="library" hidden>
+        <div class="library-sheet">
+          <header>
+            <h2>Library</h2>
+            <button id="btn-library-close" type="button">Close</button>
+          </header>
+          <div id="thumbs" class="thumbs"></div>
+          <button id="btn-library-add" type="button" class="library-add">
+            Add photos
+          </button>
+        </div>
+      </aside>
+
+      <input
+        id="file-input"
+        type="file"
+        accept="image/*"
+        multiple
+        hidden
+      />
+      <div id="toast" class="toast" role="status"></div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

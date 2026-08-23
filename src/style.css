@@ -317,20 +317,27 @@ canvas#photo,
   z-index: 10;
 }
 
+.app.studio {
+  height: 100dvh;
+  min-height: 100dvh;
+}
+
 .app.studio .chrome {
   transition: opacity 0.35s ease;
+}
+
+.app.chrome-hidden {
+  grid-template-rows: 1fr;
 }
 
 .app.chrome-hidden .chrome {
   display: none;
 }
 
-@media (orientation: landscape) {
-  .app.studio.chrome-hidden {
-    grid-template-rows: 0 1fr 0;
-    height: 100dvh;
-    min-height: 100dvh;
-  }
+.app.chrome-hidden .stage {
+  grid-row: 1;
+  height: 100%;
+  min-height: 0;
 }
 
 [hidden] {

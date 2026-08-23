@@ -212,7 +212,7 @@ canvas#photo,
 
 .hair {
   stroke: var(--hair);
-  stroke-width: 2;
+  stroke-width: 4;
   vector-effect: non-scaling-stroke;
 }
 
@@ -317,14 +317,20 @@ canvas#photo,
   z-index: 10;
 }
 
-.app.chrome-hidden .chrome {
-  opacity: 0;
-  pointer-events: none;
+.app.studio .chrome {
   transition: opacity 0.35s ease;
 }
 
-.app.studio .chrome {
-  transition: opacity 0.35s ease;
+.app.chrome-hidden .chrome {
+  display: none;
+}
+
+@media (orientation: landscape) {
+  .app.studio.chrome-hidden {
+    grid-template-rows: 0 1fr 0;
+    height: 100dvh;
+    min-height: 100dvh;
+  }
 }
 
 [hidden] {

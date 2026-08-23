@@ -201,7 +201,7 @@ canvas#photo,
 .crop-frame {
   fill: none;
   stroke: var(--accent);
-  stroke-width: 2.2;
+  stroke-width: 4.4;
 }
 
 .crop-handle {
@@ -212,7 +212,7 @@ canvas#photo,
 
 .hair {
   stroke: var(--hair);
-  stroke-width: 1;
+  stroke-width: 2;
   vector-effect: non-scaling-stroke;
 }
 

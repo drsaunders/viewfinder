@@ -38,14 +38,16 @@ export function snapQuarterTurn(radians: number): number {
   return Math.round(radians / quarter) * quarter;
 }
 
+/** Largest 4:5 crop that fits in the image, matching its landscape/portrait orientation. */
 export function defaultCrop(imgW: number, imgH: number): CropState {
-  const imageAspect = imgW / imgH;
-  const width = imageAspect > ASPECT ? imgH * ASPECT : imgW;
+  const landscape = imgW > imgH;
+  const rotation = landscape ? Math.PI / 2 : 0;
+  const width = landscape ? Math.min(imgH, imgW * ASPECT) : Math.min(imgW, imgH * ASPECT);
   return {
     cx: imgW / 2,
     cy: imgH / 2,
     width,
-    rotation: 0,
+    rotation,
   };
 }
 

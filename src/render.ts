@@ -1,7 +1,7 @@
 import {
   boundsOf,
+  cropAxisSize,
   cropCorners,
-  cropExtent,
   expandRect,
   fitView,
   rotatedImageCorners,
@@ -42,7 +42,7 @@ export function drawView(
   ctx.clearRect(0, 0, cssW, cssH);
   prep(ctx);
 
-  const { w: cropW, h: cropH } = cropExtent(crop.width);
+  const { w: cropW, h: cropH } = cropAxisSize(crop.width, crop.rotation);
   const scale = Math.min(cssW / cropW, cssH / cropH);
   const outW = cropW * scale;
   const outH = cropH * scale;
@@ -55,7 +55,6 @@ export function drawView(
   ctx.clip();
   ctx.translate(ox + outW / 2, oy + outH / 2);
   ctx.scale(scale, scale);
-  ctx.rotate(-crop.rotation);
   ctx.translate(-crop.cx, -crop.cy);
   ctx.translate(bitmap.width / 2, bitmap.height / 2);
   ctx.rotate(imageRotation);

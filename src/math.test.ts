@@ -131,4 +131,14 @@ assert(landscapeSize.h <= imgH + 1e-6, "rotated crop height fits");
 const afterImage = rotateImageWithCrop(defaultCrop(4000, 3000), 0, Math.PI / 2, 4000, 3000);
 assertInside(afterImage.crop, 4000, 3000, afterImage.imageRotation, "landscape photo after image rotate");
 
+const viewStart = defaultCrop(4000, 3000);
+const viewSize0 = cropAxisSize(viewStart.width, viewStart.rotation);
+assert(viewSize0.w > viewSize0.h, "landscape crop displays landscape");
+const viewTurn = rotateImageWithCrop(viewStart, 0, Math.PI / 2, 4000, 3000);
+const viewSize1 = cropAxisSize(viewTurn.crop.width, viewTurn.crop.rotation);
+assert(viewSize1.h > viewSize1.w, "image rotate flips the on-screen crop orientation");
+assert(Math.abs(viewSize0.w - viewSize1.h) < 1e-6, "rotated view keeps the same pixel window");
+assert(Math.abs(viewSize0.h - viewSize1.w) < 1e-6, "rotated view keeps the same pixel window");
+
 console.log("clampCrop containment tests passed");
+console.log("view orientation tests passed");

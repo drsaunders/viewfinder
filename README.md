@@ -39,7 +39,7 @@ Open [http://localhost:4537](http://localhost:4537).
 
 1. **Add photos** from your camera roll or files. The library can hold several.
 2. **Crop** opens an editor. Drag the 4:5 window, pull a corner to resize, or pinch to scale. The crop stays inside the photo. Image ↺/↻ turns the photo and the crop together around the photo's center. Crop ↺/↻ turns only the frame (portrait 4:5 or landscape 5:4). New photos start with a crop in the same orientation as the picture. **Reset** restores the largest 4:5 that matches the photo's orientation. Each photo remembers its own crop and rotations.
-3. **Crosshair** toggles the exact 50% vertical and horizontal lines of the current crop.
+3. **Crosshair** toggles the exact 50% vertical and horizontal lines of the current crop. The view shows the crop in its current orientation (portrait 4:5 or landscape 5:4), so Image ↺/↻ turns the reference on screen.
 4. **Full screen** fills the display and requests a [screen wake lock](https://developer.mozilla.org/en-US/docs/Web/API/Screen_Wake_Lock_API) so the device does not dim from idle timeout. Tap the image to show or hide the chrome; hiding removes the top and bottom bars so the photo can use the full height, especially in landscape. On phones that block the Fullscreen API, the app still expands and holds the wake lock.
 
 Keyboard: `F` full screen, `X` crosshair, `[` / `]` rotate image 90°, `Esc` back.

@@ -38,15 +38,32 @@ export function snapQuarterTurn(radians: number): number {
   return Math.round(radians / quarter) * quarter;
 }
 
+/** True when a quarter-turned crop is landscape (5:4) in the given frame. */
+export function cropIsLandscape(rotation: number): boolean {
+  const quarter = Math.round(snapQuarterTurn(rotation) / (Math.PI / 2));
+  return Math.abs(quarter) % 2 === 1;
+}
+
+/** Axis-aligned size of a 4:5 crop after `rotation`. */
+export function cropAxisSize(width: number, rotation: number): { w: number; h: number } {
+  const { w, h } = cropExtent(width);
+  return cropIsLandscape(rotation) ? { w: h, h: w } : { w, h };
+}
+
+/** Largest short-side that keeps the rotated 4:5 crop inside the image. */
+export function maxFittedCropWidth(imgW: number, imgH: number, rotation: number): number {
+  return cropIsLandscape(rotation)
+    ? Math.min(imgH, imgW * ASPECT)
+    : Math.min(imgW, imgH * ASPECT);
+}
+
 /** Largest 4:5 crop that fits in the image, matching its landscape/portrait orientation. */
 export function defaultCrop(imgW: number, imgH: number): CropState {
-  const landscape = imgW > imgH;
-  const rotation = landscape ? Math.PI / 2 : 0;
-  const width = landscape ? Math.min(imgH, imgW * ASPECT) : Math.min(imgW, imgH * ASPECT);
+  const rotation = imgW > imgH ? Math.PI / 2 : 0;
   return {
     cx: imgW / 2,
     cy: imgH / 2,
-    width,
+    width: maxFittedCropWidth(imgW, imgH, rotation),
     rotation,
   };
 }
@@ -65,6 +82,33 @@ export function cropCorners(crop: CropState): Point[] {
 
 export function rotateCropBy(crop: CropState, delta: number): CropState {
   return { ...crop, rotation: snapQuarterTurn(crop.rotation + delta) };
+}
+
+/** Rotate the crop around `origin` (the image center when keeping image+crop in sync). */
+export function rotateCropAround(crop: CropState, origin: Point, delta: number): CropState {
+  const center = rotatePoint({ x: crop.cx, y: crop.cy }, origin, delta);
+  return {
+    ...crop,
+    cx: center.x,
+    cy: center.y,
+    rotation: snapQuarterTurn(crop.rotation + delta),
+  };
+}
+
+/** Rotate the photo and the crop together around the image center. */
+export function rotateImageWithCrop(
+  crop: CropState,
+  imageRotation: number,
+  delta: number,
+  imgW: number,
+  imgH: number,
+): { crop: CropState; imageRotation: number } {
+  const nextImage = snapQuarterTurn(imageRotation + delta);
+  const nextCrop = rotateCropAround(crop, imageCenter(imgW, imgH), delta);
+  return {
+    crop: clampCrop(nextCrop, imgW, imgH, nextImage),
+    imageRotation: nextImage,
+  };
 }
 
 export function imageCorners(imgW: number, imgH: number): Point[] {
@@ -154,15 +198,31 @@ export function toCropLocal(p: Point, crop: CropState): Point {
   return { x: dx * c - dy * s, y: dx * s + dy * c };
 }
 
-export function clampCrop(crop: CropState, imgW: number, imgH: number): CropState {
-  const maxWidth = Math.max(imgW, imgH) * 1.35;
-  const width = clamp(crop.width, MIN_CROP_WIDTH, maxWidth);
-  const pad = Math.max(imgW, imgH) * 0.15;
+/** Keep the crop inside the photo, after undoing `imageRotation`. */
+export function clampCrop(
+  crop: CropState,
+  imgW: number,
+  imgH: number,
+  imageRotation = 0,
+): CropState {
+  const relRotation = snapQuarterTurn(crop.rotation - imageRotation);
+  const fitted = maxFittedCropWidth(imgW, imgH, relRotation);
+  const minWidth = Math.min(MIN_CROP_WIDTH, fitted);
+  const width = clamp(crop.width, minWidth, fitted);
+  const { w: visW, h: visH } = cropAxisSize(width, relRotation);
+  const origin = imageCenter(imgW, imgH);
+  const local = rotatePoint({ x: crop.cx, y: crop.cy }, origin, -imageRotation);
+  const clampedLocal = {
+    x: clamp(local.x, visW / 2, imgW - visW / 2),
+    y: clamp(local.y, visH / 2, imgH - visH / 2),
+  };
+  const world = rotatePoint(clampedLocal, origin, imageRotation);
   return {
     ...crop,
     width,
-    cx: clamp(crop.cx, -pad, imgW + pad),
-    cy: clamp(crop.cy, -pad, imgH + pad),
+    cx: world.x,
+    cy: world.y,
+    rotation: snapQuarterTurn(crop.rotation),
   };
 }
 

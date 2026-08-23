@@ -13,6 +13,7 @@ import {
   moveCrop,
   resizeCropFromCorner,
   rotateCropBy,
+  rotateImageWithCrop,
   scaleCrop,
   screenToWork,
   snapQuarterTurn,
@@ -157,6 +158,21 @@ export class App {
     try {
       this.bitmap = await decodePhoto(photo.blob);
       this.snapStoredRotations();
+      const contained = clampCrop(
+        photo.crop,
+        this.bitmap.width,
+        this.bitmap.height,
+        photo.imageRotation,
+      );
+      if (
+        contained.width !== photo.crop.width ||
+        contained.cx !== photo.crop.cx ||
+        contained.cy !== photo.crop.cy ||
+        contained.rotation !== photo.crop.rotation
+      ) {
+        photo.crop = contained;
+        this.persistSelected();
+      }
     } catch {
       this.announce("Could not open that photo. Remove it and add it again.");
     } finally {
@@ -253,6 +269,7 @@ export class App {
       if (!this.studio || this.mode === "crop") return;
       this.chromeHidden = true;
       this.root.classList.add("chrome-hidden");
+      this.render();
     }, 2200);
   }
 
@@ -262,22 +279,38 @@ export class App {
     if (e.target.closest("button, input, aside, a")) return;
     if (this.chromeHidden) {
       this.scheduleChromeHide();
+      this.render();
     } else {
       this.chromeHidden = true;
       this.root.classList.add("chrome-hidden");
+      this.render();
     }
   }
 
   private nudgeImage(delta: number): void {
-    if (!this.selected) return;
-    this.selected.imageRotation = snapQuarterTurn(this.selected.imageRotation + delta);
+    if (!this.selected || !this.bitmap) return;
+    const next = rotateImageWithCrop(
+      this.selected.crop,
+      this.selected.imageRotation,
+      delta,
+      this.bitmap.width,
+      this.bitmap.height,
+    );
+    this.selected.imageRotation = next.imageRotation;
+    this.selected.crop = next.crop;
     this.persistSelected();
     this.render();
   }
 
   private nudgeCrop(delta: number): void {
-    if (!this.selected) return;
-    this.selected.crop = rotateCropBy(this.selected.crop, delta);
+    if (!this.selected || !this.bitmap) return;
+    const rotated = rotateCropBy(this.selected.crop, delta);
+    this.selected.crop = clampCrop(
+      rotated,
+      this.bitmap.width,
+      this.bitmap.height,
+      this.selected.imageRotation,
+    );
     this.persistSelected();
     this.render();
   }
@@ -353,7 +386,12 @@ export class App {
       const dist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
       const factor = dist / Math.max(1, this.pinch.startDist);
       const next = scaleCrop(this.pinch.startCrop, factor);
-      this.selected.crop = clampCrop(next, this.bitmap.width, this.bitmap.height);
+      this.selected.crop = clampCrop(
+        next,
+        this.bitmap.width,
+        this.bitmap.height,
+        this.selected.imageRotation,
+      );
       this.persistSelected();
       this.render();
       return;
@@ -371,7 +409,12 @@ export class App {
     } else if (this.drag.kind === "corner" && this.drag.corner !== undefined) {
       next = resizeCropFromCorner(this.drag.startCrop, this.drag.corner, work);
     }
-    this.selected.crop = clampCrop(next, this.bitmap.width, this.bitmap.height);
+    this.selected.crop = clampCrop(
+      next,
+      this.bitmap.width,
+      this.bitmap.height,
+      this.selected.imageRotation,
+    );
     this.persistSelected();
     this.render();
   }

@@ -1,4 +1,4 @@
-import type { CropState, Point, Rect } from "./types.ts";
+import type { CropState, Point, Rect, ViewNav } from "./types.ts";
 
 /** Crop window width:height. */
 export const ASPECT = 4 / 5;
@@ -294,4 +294,98 @@ export function screenToWork(p: Point, view: ViewMap): Point {
     x: (p.x - view.origin.x) / view.scale,
     y: (p.y - view.origin.y) / view.scale,
   };
+}
+
+export const MIN_VIEW_ZOOM = 0.5;
+export const MAX_VIEW_ZOOM = 8;
+
+export function defaultViewNav(): ViewNav {
+  return { zoom: 1, pan: { x: 0, y: 0 } };
+}
+
+/** On-screen rectangle of the cropped image after fit, zoom, and pan. */
+export function viewImageRect(
+  crop: CropState,
+  cssW: number,
+  cssH: number,
+  nav: ViewNav,
+): { x: number; y: number; w: number; h: number } {
+  const { w: cropW, h: cropH } = cropAxisSize(crop.width, crop.rotation);
+  const fit = Math.min(cssW / cropW, cssH / cropH);
+  const scale = fit * nav.zoom;
+  const outW = cropW * scale;
+  const outH = cropH * scale;
+  return {
+    x: (cssW - outW) / 2 + nav.pan.x,
+    y: (cssH - outH) / 2 + nav.pan.y,
+    w: outW,
+    h: outH,
+  };
+}
+
+export function clampViewNav(
+  nav: ViewNav,
+  crop: CropState,
+  cssW: number,
+  cssH: number,
+): ViewNav {
+  const zoom = clamp(nav.zoom, MIN_VIEW_ZOOM, MAX_VIEW_ZOOM);
+  const rect = viewImageRect(crop, cssW, cssH, { zoom, pan: { x: 0, y: 0 } });
+  const maxPanX = Math.max(0, (rect.w - cssW) / 2);
+  const maxPanY = Math.max(0, (rect.h - cssH) / 2);
+  return {
+    zoom,
+    pan: {
+      x: clamp(nav.pan.x, -maxPanX, maxPanX),
+      y: clamp(nav.pan.y, -maxPanY, maxPanY),
+    },
+  };
+}
+
+/** Zoom/pan so the crop point under `from` stays under `to` (pinch or wheel). */
+export function zoomViewNav(
+  start: ViewNav,
+  factor: number,
+  from: Point,
+  to: Point,
+  crop: CropState,
+  cssW: number,
+  cssH: number,
+): ViewNav {
+  const { w: cropW, h: cropH } = cropAxisSize(crop.width, crop.rotation);
+  const fit = Math.min(cssW / cropW, cssH / cropH);
+  const startScale = fit * start.zoom;
+  const cropRel = {
+    x: (from.x - (cssW / 2 + start.pan.x)) / startScale,
+    y: (from.y - (cssH / 2 + start.pan.y)) / startScale,
+  };
+  const zoom = start.zoom * factor;
+  const nextScale = fit * clamp(zoom, MIN_VIEW_ZOOM, MAX_VIEW_ZOOM);
+  return clampViewNav(
+    {
+      zoom,
+      pan: {
+        x: to.x - cssW / 2 - cropRel.x * nextScale,
+        y: to.y - cssH / 2 - cropRel.y * nextScale,
+      },
+    },
+    crop,
+    cssW,
+    cssH,
+  );
+}
+
+export function panViewNav(
+  start: ViewNav,
+  delta: Point,
+  crop: CropState,
+  cssW: number,
+  cssH: number,
+): ViewNav {
+  return clampViewNav(
+    { zoom: start.zoom, pan: { x: start.pan.x + delta.x, y: start.pan.y + delta.y } },
+    crop,
+    cssW,
+    cssH,
+  );
 }

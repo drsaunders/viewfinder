@@ -126,6 +126,7 @@ button[aria-pressed="true"] {
   background:
     radial-gradient(1200px 700px at 50% 40%, #17140f, var(--bg));
   overflow: hidden;
+  touch-action: none;
 }
 
 .stage.drop {

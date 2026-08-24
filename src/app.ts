@@ -9,14 +9,19 @@ import {
 import { isImageFile, decodePhoto, recordFromFile } from "./image.ts";
 import {
   clampCrop,
+  clampViewNav,
   defaultCrop,
+  defaultViewNav,
   moveCrop,
+  panViewNav,
   resizeCropFromCorner,
   rotateCropBy,
   rotateImageWithCrop,
   scaleCrop,
   screenToWork,
   snapQuarterTurn,
+  viewImageRect,
+  zoomViewNav,
   type ViewMap,
 } from "./math.ts";
 import {
@@ -26,7 +31,7 @@ import {
   paintCropOverlay,
   paintCrosshair,
 } from "./render.ts";
-import type { CropState, EditorDrag, PhotoRecord, Point, UiPrefs } from "./types.ts";
+import type { CropState, EditorDrag, PhotoRecord, Point, UiPrefs, ViewNav } from "./types.ts";
 import { ScreenGuard, enterFullscreen, exitFullscreen, isFullscreen } from "./wakelock.ts";
 
 const HALF_PI = Math.PI / 2;
@@ -42,6 +47,10 @@ export class App {
   private drag: EditorDrag | null = null;
   private pointers = new Map<number, Point>();
   private pinch: { startDist: number; startCrop: CropState } | null = null;
+  private viewNav: ViewNav = defaultViewNav();
+  private viewPinch: { startDist: number; startMid: Point; startNav: ViewNav } | null = null;
+  private viewDrag: { startPointer: Point; startNav: ViewNav } | null = null;
+  private viewGestured = false;
   private guard = new ScreenGuard();
   private studio = false;
   private chromeHidden = false;
@@ -108,6 +117,7 @@ export class App {
     this.overlay.addEventListener("pointerup", (e) => this.onPointerUp(e));
     this.overlay.addEventListener("pointercancel", (e) => this.onPointerUp(e));
     this.stage.addEventListener("click", (e) => this.onStageClick(e));
+    this.stage.addEventListener("wheel", (e) => this.onWheel(e), { passive: false });
 
     this.stage.addEventListener("dragover", (e) => {
       e.preventDefault();
@@ -146,6 +156,9 @@ export class App {
     this.bitmap?.close();
     this.bitmap = null;
     this.selected = photo;
+    this.viewNav = defaultViewNav();
+    this.viewPinch = null;
+    this.viewDrag = null;
     this.prefs.selectedId = photo?.id ?? null;
     void savePrefs(this.db, this.prefs);
     if (!photo) {
@@ -214,6 +227,8 @@ export class App {
     this.mode = mode;
     this.drag = null;
     this.pinch = null;
+    this.viewPinch = null;
+    this.viewDrag = null;
     this.pointers.clear();
     this.syncChrome();
     this.render();
@@ -223,6 +238,7 @@ export class App {
     if (!this.selected || !this.bitmap) return;
     this.selected.crop = defaultCrop(this.bitmap.width, this.bitmap.height);
     this.selected.imageRotation = 0;
+    this.viewNav = defaultViewNav();
     this.persistSelected();
     this.render();
   }
@@ -277,6 +293,10 @@ export class App {
     if (!this.studio || this.mode === "crop") return;
     if (!(e.target instanceof Element)) return;
     if (e.target.closest("button, input, aside, a")) return;
+    if (this.viewGestured) {
+      this.viewGestured = false;
+      return;
+    }
     if (this.chromeHidden) {
       this.scheduleChromeHide();
       this.render();
@@ -343,13 +363,18 @@ export class App {
     return { w: Math.max(1, rect.width), h: Math.max(1, rect.height) };
   }
 
-  private pointerInStage(e: PointerEvent): Point {
+  private pointerInStage(e: { clientX: number; clientY: number }): Point {
     const rect = this.stage.getBoundingClientRect();
     return { x: e.clientX - rect.left, y: e.clientY - rect.top };
   }
 
   private onPointerDown(e: PointerEvent): void {
-    if (this.mode !== "crop" || !this.selected || !this.viewMap) return;
+    if (!this.selected) return;
+    if (this.mode === "view") {
+      this.onViewPointerDown(e);
+      return;
+    }
+    if (this.mode !== "crop" || !this.viewMap) return;
     e.preventDefault();
     this.overlay.setPointerCapture(e.pointerId);
     const p = this.pointerInStage(e);
@@ -375,7 +400,36 @@ export class App {
     };
   }
 
+  private onViewPointerDown(e: PointerEvent): void {
+    e.preventDefault();
+    this.overlay.setPointerCapture(e.pointerId);
+    const p = this.pointerInStage(e);
+    this.pointers.set(e.pointerId, p);
+
+    if (this.pointers.size === 2) {
+      const pts = [...this.pointers.values()];
+      this.viewDrag = null;
+      this.viewGestured = true;
+      this.viewPinch = {
+        startDist: Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y),
+        startMid: { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 },
+        startNav: { ...this.viewNav, pan: { ...this.viewNav.pan } },
+      };
+      return;
+    }
+
+    this.viewDrag = {
+      startPointer: p,
+      startNav: { ...this.viewNav, pan: { ...this.viewNav.pan } },
+    };
+    this.viewGestured = false;
+  }
+
   private onPointerMove(e: PointerEvent): void {
+    if (this.mode === "view") {
+      this.onViewPointerMove(e);
+      return;
+    }
     if (this.mode !== "crop" || !this.selected || !this.viewMap || !this.bitmap) return;
     if (!this.pointers.has(e.pointerId)) return;
     const p = this.pointerInStage(e);
@@ -419,10 +473,67 @@ export class App {
     this.render();
   }
 
+  private onViewPointerMove(e: PointerEvent): void {
+    if (!this.selected || !this.pointers.has(e.pointerId)) return;
+    const p = this.pointerInStage(e);
+    this.pointers.set(e.pointerId, p);
+    const { w, h } = this.stageSize();
+
+    if (this.pointers.size >= 2) {
+      const pts = [...this.pointers.values()];
+      const dist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+      const mid = { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 };
+      if (!this.viewPinch) {
+        this.viewDrag = null;
+        this.viewPinch = {
+          startDist: dist,
+          startMid: mid,
+          startNav: { ...this.viewNav, pan: { ...this.viewNav.pan } },
+        };
+      }
+      const factor = dist / Math.max(1, this.viewPinch.startDist);
+      this.viewNav = zoomViewNav(
+        this.viewPinch.startNav,
+        factor,
+        this.viewPinch.startMid,
+        mid,
+        this.selected.crop,
+        w,
+        h,
+      );
+      this.viewGestured = true;
+      this.render();
+      return;
+    }
+
+    if (!this.viewDrag) return;
+    const dx = p.x - this.viewDrag.startPointer.x;
+    const dy = p.y - this.viewDrag.startPointer.y;
+    if (Math.hypot(dx, dy) > 4) this.viewGestured = true;
+    this.viewNav = panViewNav(this.viewDrag.startNav, { x: dx, y: dy }, this.selected.crop, w, h);
+    this.render();
+  }
+
   private onPointerUp(e: PointerEvent): void {
     this.pointers.delete(e.pointerId);
-    if (this.pointers.size < 2) this.pinch = null;
-    if (this.pointers.size === 0) this.drag = null;
+    if (this.pointers.size < 2) {
+      this.pinch = null;
+      this.viewPinch = null;
+    }
+    if (this.pointers.size === 0) {
+      this.drag = null;
+      this.viewDrag = null;
+    }
+  }
+
+  private onWheel(e: WheelEvent): void {
+    if (this.mode !== "view" || !this.selected) return;
+    e.preventDefault();
+    const { w, h } = this.stageSize();
+    const at = this.pointerInStage(e);
+    const factor = Math.exp(-e.deltaY * 0.002);
+    this.viewNav = zoomViewNav(this.viewNav, factor, at, at, this.selected.crop, w, h);
+    this.render();
   }
 
   private onKey(e: KeyboardEvent): void {
@@ -521,7 +632,7 @@ export class App {
     this.btnFullscreen.setAttribute("aria-pressed", String(this.studio));
     this.btnFullscreen.classList.toggle("on", this.studio);
     $("#btn-library").setAttribute("aria-expanded", String(!this.libraryEl.hidden));
-    this.overlay.style.pointerEvents = this.mode === "crop" ? "auto" : "none";
+    this.overlay.style.pointerEvents = hasPhoto ? "auto" : "none";
     this.root.dataset.mode = this.mode;
   }
 
@@ -553,8 +664,18 @@ export class App {
 
     setLayer(cropGroup, false);
     this.viewMap = null;
-    drawView(this.canvas, this.bitmap, this.selected.crop, this.selected.imageRotation, w, h);
-    paintCrosshair(this.overlay, w, h);
+    this.viewNav = clampViewNav(this.viewNav, this.selected.crop, w, h);
+    drawView(
+      this.canvas,
+      this.bitmap,
+      this.selected.crop,
+      this.selected.imageRotation,
+      w,
+      h,
+      this.viewNav,
+    );
+    paintCrosshair(this.overlay, w, h, viewImageRect(this.selected.crop, w, h, this.viewNav));
+    setLayer(hairGroup, this.prefs.crosshair);
     setLayer(hairGroup, this.prefs.crosshair);
   }
 

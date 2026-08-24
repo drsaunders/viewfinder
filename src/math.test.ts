@@ -5,11 +5,15 @@ import {
   cropCorners,
   cropExtent,
   defaultCrop,
+  defaultViewNav,
   imageCenter,
+  MAX_VIEW_ZOOM,
   rotateCropAround,
   rotateCropBy,
   rotateImageWithCrop,
   rotatePoint,
+  viewImageRect,
+  zoomViewNav,
 } from "./math.ts";
 import type { CropState, Point } from "./types.ts";
 
@@ -142,3 +146,29 @@ assert(Math.abs(viewSize0.h - viewSize1.w) < 1e-6, "rotated view keeps the same 
 
 console.log("clampCrop containment tests passed");
 console.log("view orientation tests passed");
+
+const zoomCrop = defaultCrop(4000, 3000);
+const startNav = defaultViewNav();
+const cssW = 1600;
+const cssH = 900;
+const before = viewImageRect(zoomCrop, cssW, cssH, startNav);
+const focus = { x: before.x + before.w * 0.25, y: before.y + before.h * 0.25 };
+const zoomed = zoomViewNav(startNav, 2, focus, focus, zoomCrop, cssW, cssH);
+assert(zoomed.zoom === 2, "pinch zoom doubles the view scale");
+const after = viewImageRect(zoomCrop, cssW, cssH, zoomed);
+const relX0 = (focus.x - (before.x + before.w / 2)) / before.w;
+const relY0 = (focus.y - (before.y + before.h / 2)) / before.h;
+const relX1 = (focus.x - (after.x + after.w / 2)) / after.w;
+const relY1 = (focus.y - (after.y + after.h / 2)) / after.h;
+nearly(relX1, relX0, "zoom keeps the focal point on the same image location");
+nearly(relY1, relY0, "zoom keeps the focal point on the same image location");
+assert(Math.abs(after.w - before.w * 2) < 1 || after.w >= cssW - 1e-6, "zoomed image is larger");
+assert(zoomCrop.width === defaultCrop(4000, 3000).width, "zoom does not change the crop");
+assert(zoomCrop.cx === defaultCrop(4000, 3000).cx, "zoom does not move the crop");
+
+const midAfter = { x: after.x + after.w / 2, y: after.y + after.h / 2 };
+assert(Math.abs(midAfter.x - (after.x + after.w / 2)) < 1e-9, "crosshair stays on the image midlines");
+const capped = zoomViewNav(startNav, 100, { x: cssW / 2, y: cssH / 2 }, { x: cssW / 2, y: cssH / 2 }, zoomCrop, cssW, cssH);
+nearly(capped.zoom, MAX_VIEW_ZOOM, "view zoom is capped");
+
+console.log("view zoom tests passed");

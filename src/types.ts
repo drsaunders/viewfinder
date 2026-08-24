@@ -43,3 +43,9 @@ export interface EditorDrag {
   startPointer: Point;
   startCrop: CropState;
 }
+
+/** View-only pan/zoom. Does not change the stored crop. */
+export interface ViewNav {
+  zoom: number;
+  pan: Point;
+}

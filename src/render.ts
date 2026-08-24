@@ -6,10 +6,11 @@ import {
   fitView,
   rotatedImageCorners,
   unionRect,
+  viewImageRect,
   workToScreen,
   type ViewMap,
 } from "./math.ts";
-import type { CropState, Point } from "./types.ts";
+import type { CropState, Point, ViewNav } from "./types.ts";
 
 export function sizeCanvas(canvas: HTMLCanvasElement, cssW: number, cssH: number): number {
   const dpr = Math.max(1, window.devicePixelRatio || 1);
@@ -34,6 +35,7 @@ export function drawView(
   imageRotation: number,
   cssW: number,
   cssH: number,
+  nav: ViewNav,
 ): void {
   const dpr = sizeCanvas(canvas, cssW, cssH);
   const ctx = canvas.getContext("2d");
@@ -42,18 +44,15 @@ export function drawView(
   ctx.clearRect(0, 0, cssW, cssH);
   prep(ctx);
 
-  const { w: cropW, h: cropH } = cropAxisSize(crop.width, crop.rotation);
-  const scale = Math.min(cssW / cropW, cssH / cropH);
-  const outW = cropW * scale;
-  const outH = cropH * scale;
-  const ox = (cssW - outW) / 2;
-  const oy = (cssH - outH) / 2;
+  const rect = viewImageRect(crop, cssW, cssH, nav);
+  const { w: cropW } = cropAxisSize(crop.width, crop.rotation);
+  const scale = rect.w / cropW;
 
   ctx.save();
   ctx.beginPath();
-  ctx.rect(ox, oy, outW, outH);
+  ctx.rect(rect.x, rect.y, rect.w, rect.h);
   ctx.clip();
-  ctx.translate(ox + outW / 2, oy + outH / 2);
+  ctx.translate(rect.x + rect.w / 2, rect.y + rect.h / 2);
   ctx.scale(scale, scale);
   ctx.translate(-crop.cx, -crop.cy);
   ctx.translate(bitmap.width / 2, bitmap.height / 2);
@@ -138,21 +137,28 @@ export function paintCropOverlay(
   });
 }
 
-export function paintCrosshair(svg: SVGSVGElement, cssW: number, cssH: number): void {
+export function paintCrosshair(
+  svg: SVGSVGElement,
+  cssW: number,
+  cssH: number,
+  image: { x: number; y: number; w: number; h: number },
+): void {
   svg.setAttribute("viewBox", `0 0 ${cssW} ${cssH}`);
   svg.setAttribute("width", String(cssW));
   svg.setAttribute("height", String(cssH));
   const v = svg.querySelector<SVGLineElement>("#hair-v");
   const h = svg.querySelector<SVGLineElement>("#hair-h");
   if (!v || !h) return;
-  v.setAttribute("x1", String(cssW / 2));
-  v.setAttribute("x2", String(cssW / 2));
-  v.setAttribute("y1", "0");
-  v.setAttribute("y2", String(cssH));
-  h.setAttribute("x1", "0");
-  h.setAttribute("x2", String(cssW));
-  h.setAttribute("y1", String(cssH / 2));
-  h.setAttribute("y2", String(cssH / 2));
+  const midX = image.x + image.w / 2;
+  const midY = image.y + image.h / 2;
+  v.setAttribute("x1", String(midX));
+  v.setAttribute("x2", String(midX));
+  v.setAttribute("y1", String(image.y));
+  v.setAttribute("y2", String(image.y + image.h));
+  h.setAttribute("x1", String(image.x));
+  h.setAttribute("x2", String(image.x + image.w));
+  h.setAttribute("y1", String(midY));
+  h.setAttribute("y2", String(midY));
 }
 
 export function hitEditor(

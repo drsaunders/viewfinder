@@ -8,6 +8,7 @@ import {
   defaultViewNav,
   imageCenter,
   MAX_VIEW_ZOOM,
+  MIN_VIEW_ZOOM,
   rotateCropAround,
   rotateCropBy,
   rotateImageWithCrop,
@@ -170,5 +171,7 @@ const midAfter = { x: after.x + after.w / 2, y: after.y + after.h / 2 };
 assert(Math.abs(midAfter.x - (after.x + after.w / 2)) < 1e-9, "crosshair stays on the image midlines");
 const capped = zoomViewNav(startNav, 100, { x: cssW / 2, y: cssH / 2 }, { x: cssW / 2, y: cssH / 2 }, zoomCrop, cssW, cssH);
 nearly(capped.zoom, MAX_VIEW_ZOOM, "view zoom is capped");
+const shrunk = zoomViewNav(zoomed, 0.01, { x: cssW / 2, y: cssH / 2 }, { x: cssW / 2, y: cssH / 2 }, zoomCrop, cssW, cssH);
+nearly(shrunk.zoom, MIN_VIEW_ZOOM, "view cannot zoom out past 1x");
 
 console.log("view zoom tests passed");

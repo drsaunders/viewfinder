@@ -72,6 +72,7 @@ export class App {
   private readonly toast = $("#toast");
   private readonly btnCrosshair = $("#btn-crosshair");
   private readonly btnFullscreen = $("#btn-fullscreen");
+  private readonly btnZoomReset = $("#btn-zoom-reset");
 
   async start(): Promise<void> {
     this.db = await openDb();
@@ -103,6 +104,10 @@ export class App {
     });
     this.btnFullscreen.addEventListener("click", () => {
       void this.toggleStudio();
+    });
+    this.btnZoomReset.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this.resetViewZoom();
     });
 
     $("#btn-img-ccw").addEventListener("click", () => this.nudgeImage(-HALF_PI));
@@ -240,6 +245,11 @@ export class App {
     this.selected.imageRotation = 0;
     this.viewNav = defaultViewNav();
     this.persistSelected();
+    this.render();
+  }
+
+  private resetViewZoom(): void {
+    this.viewNav = defaultViewNav();
     this.render();
   }
 
@@ -644,12 +654,14 @@ export class App {
     if (!this.selected || !this.bitmap) {
       setLayer(cropGroup, false);
       setLayer(hairGroup, false);
+      this.btnZoomReset.hidden = true;
       return;
     }
 
     if (this.mode === "crop") {
       setLayer(hairGroup, false);
       setLayer(cropGroup, true);
+      this.btnZoomReset.hidden = true;
       this.viewMap = drawEditor(
         this.canvas,
         this.bitmap,
@@ -676,7 +688,7 @@ export class App {
     );
     paintCrosshair(this.overlay, w, h, viewImageRect(this.selected.crop, w, h, this.viewNav));
     setLayer(hairGroup, this.prefs.crosshair);
-    setLayer(hairGroup, this.prefs.crosshair);
+    this.btnZoomReset.hidden = this.viewNav.zoom <= 1.001;
   }
 
   private announce(message: string): void {

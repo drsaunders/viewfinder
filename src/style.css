@@ -217,6 +217,28 @@ canvas#photo,
   vector-effect: non-scaling-stroke;
 }
 
+.zoom-reset {
+  position: absolute;
+  right: max(12px, var(--safe-r));
+  bottom: max(12px, var(--safe-b));
+  z-index: 2;
+  min-height: 36px;
+  padding: 6px 12px;
+  font-weight: 500;
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+  color: rgba(242, 236, 227, 0.55);
+  background: rgba(14, 13, 11, 0.28);
+  border-color: rgba(44, 40, 32, 0.45);
+  backdrop-filter: blur(10px);
+}
+
+.zoom-reset:hover {
+  color: var(--text);
+  border-color: #4a4336;
+  background: rgba(28, 26, 22, 0.55);
+}
+
 .library {
   position: fixed;
   inset: 0;

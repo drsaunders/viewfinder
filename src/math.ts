@@ -296,7 +296,7 @@ export function screenToWork(p: Point, view: ViewMap): Point {
   };
 }
 
-export const MIN_VIEW_ZOOM = 0.5;
+export const MIN_VIEW_ZOOM = 1;
 export const MAX_VIEW_ZOOM = 8;
 
 export function defaultViewNav(): ViewNav {

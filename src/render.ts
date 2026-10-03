@@ -1,11 +1,8 @@
 import {
-  boundsOf,
   cropAxisSize,
   cropCorners,
-  expandRect,
+  editorWorldRect,
   fitView,
-  rotatedImageCorners,
-  unionRect,
   viewImageRect,
   workToScreen,
   type ViewMap,
@@ -68,26 +65,23 @@ export function editorViewMap(
   imageRotation: number,
   cssW: number,
   cssH: number,
+  focus: "crop" | "image" = "crop",
 ): ViewMap {
-  const imageBounds = boundsOf(
-    rotatedImageCorners(bitmap.width, bitmap.height, imageRotation),
-  );
-  const cropBounds = boundsOf(cropCorners(crop));
-  const world = expandRect(unionRect(imageBounds, cropBounds), 24);
-  return fitView(world, cssW, cssH, 56);
+  const world = editorWorldRect(bitmap.width, bitmap.height, crop, imageRotation, focus);
+  return fitView(world, cssW, cssH, focus === "image" ? 56 : 48);
 }
 
 export function drawEditor(
   canvas: HTMLCanvasElement,
   bitmap: ImageBitmap,
-  crop: CropState,
+  _crop: CropState,
   imageRotation: number,
   cssW: number,
   cssH: number,
+  view: ViewMap,
 ): ViewMap {
   const dpr = sizeCanvas(canvas, cssW, cssH);
   const ctx = canvas.getContext("2d");
-  const view = editorViewMap(bitmap, crop, imageRotation, cssW, cssH);
   if (!ctx) return view;
 
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);

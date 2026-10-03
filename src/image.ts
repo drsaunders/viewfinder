@@ -1,5 +1,6 @@
-import { defaultCrop } from "./math.ts";
-import type { PhotoRecord } from "./types.ts";
+import { cropAxisSize, defaultCrop, defaultViewNav } from "./math.ts";
+import { drawView } from "./render.ts";
+import type { CropState, PhotoRecord } from "./types.ts";
 
 const MAX_EDGE = 4096;
 
@@ -34,8 +35,19 @@ function loadImage(url: string): Promise<HTMLImageElement> {
   });
 }
 
-export async function makeThumb(bitmap: ImageBitmap): Promise<Blob> {
-  return (await rasterize(bitmap, 280, 0.82)).blob;
+/** Library thumbnail of the current crop, not the full original photo. */
+export async function makeCropThumb(
+  bitmap: ImageBitmap,
+  crop: CropState,
+  imageRotation: number,
+): Promise<Blob> {
+  const { w: cropW, h: cropH } = cropAxisSize(crop.width, crop.rotation);
+  const scale = 280 / Math.max(cropW, cropH);
+  const cssW = Math.max(1, Math.round(cropW * scale));
+  const cssH = Math.max(1, Math.round(cropH * scale));
+  const canvas = document.createElement("canvas");
+  drawView(canvas, bitmap, crop, imageRotation, cssW, cssH, defaultViewNav());
+  return canvasToBlob(canvas, "image/jpeg", 0.82);
 }
 
 async function rasterize(
@@ -93,7 +105,8 @@ export async function recordFromFile(file: File): Promise<PhotoRecord> {
     } catch {
       stored = raw;
     }
-    const thumb = await makeThumb(bitmap);
+    const crop = defaultCrop(width, height);
+    const thumb = await makeCropThumb(bitmap, crop, 0);
     return {
       id: crypto.randomUUID(),
       name: file.name || "Photo",
@@ -101,7 +114,7 @@ export async function recordFromFile(file: File): Promise<PhotoRecord> {
       blob: stored,
       thumb,
       imageRotation: 0,
-      crop: defaultCrop(width, height),
+      crop,
     };
   } finally {
     bitmap.close();

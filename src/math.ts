@@ -268,6 +268,23 @@ export interface ViewMap {
   origin: Point;
 }
 
+/** World bounds the crop editor should frame. */
+export function editorWorldRect(
+  imgW: number,
+  imgH: number,
+  crop: CropState,
+  imageRotation: number,
+  focus: "crop" | "image",
+): Rect {
+  const cropBounds = boundsOf(cropCorners(crop));
+  if (focus === "image") {
+    const imageBounds = boundsOf(rotatedImageCorners(imgW, imgH, imageRotation));
+    return expandRect(unionRect(imageBounds, cropBounds), 24);
+  }
+  const pad = Math.max(rectWidth(cropBounds), rectHeight(cropBounds), 48) * 0.28;
+  return expandRect(cropBounds, pad);
+}
+
 export function fitView(rect: Rect, viewW: number, viewH: number, inset: number): ViewMap {
   const availW = Math.max(1, viewW - inset * 2);
   const availH = Math.max(1, viewH - inset * 2);

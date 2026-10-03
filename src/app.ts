@@ -6,10 +6,11 @@ import {
   savePhoto,
   savePrefs,
 } from "./db.ts";
-import { isImageFile, decodePhoto, recordFromFile } from "./image.ts";
+import { isImageFile, decodePhoto, makeCropThumb, recordFromFile } from "./image.ts";
 import {
   clampCrop,
   clampViewNav,
+  cropIsLandscape,
   defaultCrop,
   defaultViewNav,
   moveCrop,
@@ -27,6 +28,7 @@ import {
 import {
   drawEditor,
   drawView,
+  editorViewMap,
   hitEditor,
   paintCropOverlay,
   paintCrosshair,
@@ -44,6 +46,9 @@ export class App {
   private selected: PhotoRecord | null = null;
   private mode: "view" | "crop" = "view";
   private viewMap: ViewMap | null = null;
+  private editorFocus: "crop" | "image" = "crop";
+  private editorView: ViewMap | null = null;
+  private editorViewKey = "";
   private drag: EditorDrag | null = null;
   private pointers = new Map<number, Point>();
   private pinch: { startDist: number; startCrop: CropState } | null = null;
@@ -114,8 +119,7 @@ export class App {
     $("#btn-img-cw").addEventListener("click", () => this.nudgeImage(HALF_PI));
     $("#btn-img-ccw-crop").addEventListener("click", () => this.nudgeImage(-HALF_PI));
     $("#btn-img-cw-crop").addEventListener("click", () => this.nudgeImage(HALF_PI));
-    $("#btn-crop-ccw").addEventListener("click", () => this.nudgeCrop(-HALF_PI));
-    $("#btn-crop-cw").addEventListener("click", () => this.nudgeCrop(HALF_PI));
+    $("#btn-crop-orient").addEventListener("click", () => this.nudgeCrop(HALF_PI));
 
     this.overlay.addEventListener("pointerdown", (e) => this.onPointerDown(e));
     this.overlay.addEventListener("pointermove", (e) => this.onPointerMove(e));
@@ -222,9 +226,12 @@ export class App {
     } finally {
       this.loading.hidden = true;
     }
-    this.toggleLibrary(this.photos.length > 1);
+    this.toggleLibrary(false);
     this.renderLibrary();
-    if (last) await this.select(last);
+    if (last) {
+      await this.select(last);
+      this.setMode("view");
+    }
   }
 
   private setMode(mode: "view" | "crop"): void {
@@ -235,6 +242,10 @@ export class App {
     this.viewPinch = null;
     this.viewDrag = null;
     this.pointers.clear();
+    if (mode === "crop") {
+      this.editorFocus = "crop";
+      this.forgetEditorView();
+    }
     this.syncChrome();
     this.render();
   }
@@ -244,6 +255,8 @@ export class App {
     this.selected.crop = defaultCrop(this.bitmap.width, this.bitmap.height);
     this.selected.imageRotation = 0;
     this.viewNav = defaultViewNav();
+    this.editorFocus = "image";
+    this.forgetEditorView();
     this.persistSelected();
     this.render();
   }
@@ -328,6 +341,7 @@ export class App {
     );
     this.selected.imageRotation = next.imageRotation;
     this.selected.crop = next.crop;
+    this.forgetEditorView();
     this.persistSelected();
     this.render();
   }
@@ -341,6 +355,7 @@ export class App {
       this.bitmap.height,
       this.selected.imageRotation,
     );
+    this.forgetEditorView();
     this.persistSelected();
     this.render();
   }
@@ -364,8 +379,47 @@ export class App {
     if (!this.selected) return;
     window.clearTimeout(this.saveTimer);
     this.saveTimer = window.setTimeout(() => {
-      if (this.selected) void savePhoto(this.db, this.selected);
+      if (this.selected) void this.saveSelectedWithThumb();
     }, 200);
+  }
+
+  private async saveSelectedWithThumb(): Promise<void> {
+    if (!this.selected) return;
+    if (this.bitmap) {
+      try {
+        this.selected.thumb = await makeCropThumb(
+          this.bitmap,
+          this.selected.crop,
+          this.selected.imageRotation,
+        );
+        const old = this.thumbUrls.get(this.selected.id);
+        if (old) URL.revokeObjectURL(old);
+        this.thumbUrls.delete(this.selected.id);
+        this.renderLibrary();
+      } catch {
+        // Keep the last thumbnail if a refresh fails.
+      }
+    }
+    await savePhoto(this.db, this.selected);
+  }
+
+  private forgetEditorView(): void {
+    this.editorView = null;
+    this.editorViewKey = "";
+  }
+
+  private cropEditorView(
+    bitmap: ImageBitmap,
+    crop: CropState,
+    imageRotation: number,
+    cssW: number,
+    cssH: number,
+  ): ViewMap {
+    const key = `${cssW}x${cssH}:${this.editorFocus}`;
+    if (this.editorView && this.editorViewKey === key) return this.editorView;
+    this.editorView = editorViewMap(bitmap, crop, imageRotation, cssW, cssH, this.editorFocus);
+    this.editorViewKey = key;
+    return this.editorView;
   }
 
   private stageSize(): { w: number; h: number } {
@@ -579,15 +633,24 @@ export class App {
       return;
     }
     for (const photo of this.photos) {
-      const url = this.thumbUrl(photo);
+      const wrap = document.createElement("div");
+      wrap.className = "thumb-wrap";
+      wrap.classList.toggle("selected", photo.id === this.selected?.id);
+      wrap.classList.toggle("landscape", cropIsLandscape(photo.crop.rotation));
+
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "thumb";
-      btn.classList.toggle("selected", photo.id === this.selected?.id);
       btn.setAttribute("aria-label", photo.name);
       const img = document.createElement("img");
-      img.src = url;
+      img.src = this.thumbUrl(photo);
       img.alt = photo.name;
+      btn.append(img);
+      btn.addEventListener("click", () => {
+        void this.select(photo);
+        this.toggleLibrary(false);
+      });
+
       const del = document.createElement("button");
       del.type = "button";
       del.className = "thumb-del";
@@ -597,12 +660,9 @@ export class App {
         e.stopPropagation();
         void this.removePhoto(photo.id);
       });
-      btn.append(img, del);
-      btn.addEventListener("click", () => {
-        void this.select(photo);
-        if (window.matchMedia("(max-width: 720px)").matches) this.toggleLibrary(false);
-      });
-      this.thumbsEl.append(btn);
+
+      wrap.append(btn, del);
+      this.thumbsEl.append(wrap);
     }
   }
 
@@ -662,13 +722,21 @@ export class App {
       setLayer(hairGroup, false);
       setLayer(cropGroup, true);
       this.btnZoomReset.hidden = true;
-      this.viewMap = drawEditor(
+      this.viewMap = this.cropEditorView(
+        this.bitmap,
+        this.selected.crop,
+        this.selected.imageRotation,
+        w,
+        h,
+      );
+      drawEditor(
         this.canvas,
         this.bitmap,
         this.selected.crop,
         this.selected.imageRotation,
         w,
         h,
+        this.viewMap,
       );
       paintCropOverlay(this.overlay, this.selected.crop, this.viewMap, w, h);
       return;

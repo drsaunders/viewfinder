@@ -6,12 +6,14 @@ import {
   cropExtent,
   defaultCrop,
   defaultViewNav,
+  editorWorldRect,
   imageCenter,
   MAX_VIEW_ZOOM,
   MIN_VIEW_ZOOM,
   rotateCropAround,
   rotateCropBy,
   rotateImageWithCrop,
+  rectWidth,
   rotatePoint,
   viewImageRect,
   zoomViewNav,
@@ -175,3 +177,11 @@ const shrunk = zoomViewNav(zoomed, 0.01, { x: cssW / 2, y: cssH / 2 }, { x: cssW
 nearly(shrunk.zoom, MIN_VIEW_ZOOM, "view cannot zoom out past 1x");
 
 console.log("view zoom tests passed");
+
+const tight: CropState = { cx: 2000, cy: 1500, width: 400, rotation: Math.PI / 2 };
+const cropFrame = editorWorldRect(4000, 3000, tight, 0, "crop");
+const imageFrame = editorWorldRect(4000, 3000, tight, 0, "image");
+assert(rectWidth(cropFrame) < rectWidth(imageFrame), "crop editor starts on the current crop");
+assert(rectWidth(imageFrame) >= 4000, "reset/global framing includes the full photo");
+
+console.log("editor framing tests passed");

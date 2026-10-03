@@ -2,7 +2,7 @@
 
 A browser drawing assistant. Upload a photo, crop it to **4:5**, keep a faint midpoint crosshair over the current crop, and go full screen so the tablet stays awake while you draw.
 
-There is no backend. Photos and crops stay in this browser (IndexedDB).
+There is no backend. Photos and crops stay in this browser (IndexedDB). App updates keep that local library: existing photos are not deleted.
 
 Live site, once Pages is enabled:
 

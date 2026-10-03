@@ -1,4 +1,5 @@
 import {
+  cropIsPlaceholder,
   deletePhoto,
   listPhotos,
   loadPrefs,
@@ -180,6 +181,9 @@ export class App {
     try {
       this.bitmap = await decodePhoto(photo.blob);
       this.snapStoredRotations();
+      if (cropIsPlaceholder(photo.crop)) {
+        photo.crop = defaultCrop(this.bitmap.width, this.bitmap.height);
+      }
       const contained = clampCrop(
         photo.crop,
         this.bitmap.width,
@@ -636,7 +640,10 @@ export class App {
       const wrap = document.createElement("div");
       wrap.className = "thumb-wrap";
       wrap.classList.toggle("selected", photo.id === this.selected?.id);
-      wrap.classList.toggle("landscape", cropIsLandscape(photo.crop.rotation));
+      wrap.classList.toggle(
+        "landscape",
+        Boolean(photo.crop && cropIsLandscape(photo.crop.rotation)),
+      );
 
       const btn = document.createElement("button");
       btn.type = "button";
